@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" class="h-100">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Games</title>
+	<link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-toaster@5.1.0/css/bootstrap-toaster.min.css" />
+</head>
+<body class="h-100 text-center text-white bg-dark">
+	<div id="app" class="h-100 vignette">
+		<component
+			@send="send"
+			:is="game"
+			:data="data"
+			:moves="moves"
+			:state="state"></component>
+	</div>
+
+	<template id="lobby">
+		<main class="h-100 d-flex justify-content-center align-items-center text-dark">
+			<div
+				v-if="moves.includes('lobby.join')"
+				class="w-100 bg-white p-3 rounded white-shadow"
+				:style="{ 'max-width': '20em' }">
+				<h1 class="mb-3">CardGame™</h1>
+				<form @submit.prevent="$emit('send', 'lobby.join', { lobby, name })">
+					<input type="text" v-model="name" autofocus="autofocus" class="form-control mb-2" placeholder="Name">
+					<input type="text" v-model="lobby" class="form-control mb-2" placeholder="Lobby">
+					<button
+						type="submit"
+						class="btn btn-md btn-primary"
+						:style="{ color: '#fff !important' }">Join</button>
+				</form>
+			</div>
+			<div v-else-if="state && state.clients"
+				class="mx-2 w-100 bg-white p-3 rounded white-shadow"
+				:style="{ 'max-width': '45em' }">
+				<h1 class="mb-3">Lobby</h1>
+				<div class="mb-4 list-unstyled border-top border-bottom d-flex justify-content-center">
+					<table>
+						<tr v-for="client in orderedClients">
+							<td>
+								<crown v-if="client.leader"></crown>
+								<crown
+									v-else-if="me.leader"
+									class="transfer-crown"
+									@click="$emit('send', 'lobby.transfer', { id: client.id })"></crown>
+							</td>
+							<td class="ps-2 text-start">
+								<span
+									v-if="me.leader && !client.leader"
+									@click="$emit('send', 'lobby.kick', { id: client.id })"
+									class="kick">{{ client.name }}</span>
+								<span v-else :style="client.leader ? { color: '#cc8f00' } : {}">{{ client.name }}</span>
+							</td>
+						</tr>
+					</table>
+				</div>
+				<div class="d-flex mb-4">
+					<button
+						v-for="game in games"
+						@click="moves.includes('lobby.select') ? $emit('send', 'lobby.select', { game: game.id }) : null"
+						:class="`btn btn-sm ${game.id === state.game ? 'bg-success' : 'bg-dark'} border-2 mx-1`"
+						:style="{ color: '#fff !important' }">{{ game.name }}</button>
+				</div>
+				<div v-if="moves.includes('lobby.start')">
+					<button
+						@click="$emit('send', 'lobby.start')"
+						class="btn btn-sm border-success bg-success btn-secondary">Start</button>
+				</div>
+			</div>
+		</main>
+	</template>
+
+	<template id="lobby-controls">
+		<div v-if="this.state.lobby.frozen" class="freeze d-flex justify-content-center align-items-center flex-column">
+			<span>Game is currently frozen. Please be patient.</span>
+			<button
+				v-if="moves.includes('lobby.return')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'lobby.return')">Return to lobby</button>
+		</div>
+		<back-arrow
+			v-else-if="moves.includes('lobby.return')"
+			class="back-arrow"
+			@click="$emit('send', 'lobby.return')"></back-arrow>
+	</template>
+
+	<template id="the-mind">
+		<lobby-controls
+			@send="$emit('send', $event)"
+			:data="data"
+			:moves="moves"
+			:state="state"></lobby-controls>
+
+		<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+			<span>
+				<div class="hand">
+					<div
+						v-for="(card, i) in lastTwoCards"
+						:class="`playing-card ${i === 0 && lastTwoCards.length > 1 ? 'inactive' : null}`"
+						:style="{ '--translateX': lastTwoCards.length === 1 ? null : `${-20 * i - 10}px` }">
+						{{ card }}
+					</div>
+				</div>
+			</span>
+			<span>
+				<heart
+					v-for="n in Math.max(5, state.lives)"
+					:fill="n <= state.lives ? 'white' : null"></heart>
+			</span>
+			<span>
+				Shurikens: {{ state.shurikens }}
+			</span>
+			<span v-if="state.won">You won the game. Cool</span>
+			<span v-else-if="state.lost">You lost the game bozo</span>
+			<span v-else-if="state.round.won">You won the round. Cool</span>
+			<span v-else-if="state.round.lost">You lost the round bozo</span>
+			<button
+				v-if="moves.includes('next_round')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'next_round')">Next Round {{ reward }}</button>
+			<button
+				v-if="moves.includes('retry_round')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'retry_round')">Retry round</button>
+			<button
+				v-if="moves.includes('restart_game')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'restart_game')">Restart game</button>
+			<button
+				v-if="moves.includes('use_shuriken')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'use_shuriken')">Use shuriken</button>
+		</div>
+		<div
+			v-for="(hand, i) in hands"
+			:class="`hand pos-${i}`"
+			:style="{ '--hand-half-width': `${(20 + 40 * hand.length) / 2}px`, '--hand-half-width-raw': `${30 * hand.length}px` }">
+			<div
+				v-for="(card, j) in hand"
+				:class="`playing-card ${card ? '' : 'back'} ${(card && moves.includes(card.toString())) ? 'pointer' : ''}`"
+				:style="{ '--translateX': `-${20 * j}px`, 'z-index': -j }"
+				@click="(card && moves.includes(card.toString())) ? $emit('send', card.toString()) : null">
+				{{ card }}
+			</div>
+		</div>
+	</template>
+
+	<template id="war">
+		<lobby-controls
+			@send="$emit('send', $event)"
+			:data="data"
+			:moves="moves"
+			:state="state"></lobby-controls>
+
+		<div
+			v-for="(card, i) in placedCards"
+			:class="`hand secondary pos-${i}`"
+			:style="{ '--hand-half-width': `30px`, '--hand-half-width-raw': '30px' }">
+			<div
+				v-if="card"
+				:class="`playing-card ${card === true ? 'back' : ''} ${card === state.round_highest ? 'winner' : ''}`"
+				:style="{ '--translateX': '0px' }">
+				{{ card }}
+			</div>
+		</div>
+		<div
+			v-for="(hand, i) in hands"
+			:class="`hand primary pos-${i}`"
+			:style="{ '--hand-half-width': `${(20 + 40 * hand.length) / 2}px`, '--hand-half-width-raw': `${30 * hand.length}px` }">
+			<div
+				v-for="(card, j) in hand"
+				:class="`playing-card ${card ? '' : 'back'} ${(card && moves.includes(card.toString())) ? 'pointer' : ''}`"
+				:style="{ '--translateX': `-${20 * j}px`, 'z-index': -j }"
+				@click="(card && moves.includes(card.toString())) ? $emit('send', card.toString()) : null">
+				{{ card }}
+			</div>
+		</div>
+		<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+			<button
+				v-if="moves.includes('next_round')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'next_round')">Next Round</button>
+
+			<button
+				v-if="moves.includes('war')"
+				class="btn btn-sm btn-primary"
+				@click="$emit('send', 'war')">War!</button>
+		</div>
+	</template>
+
+	<script src="https://unpkg.com/vue@3"></script>
+ 	<script src="https://kit.fontawesome.com/7140885e2d.js" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap-toaster@5.1.0/js/bootstrap-toaster.min.js"></script>
+	<script>
+		Toast.setTheme(TOAST_THEME.LIGHT);
+
+		const { createApp } = Vue;
+
+		const app = createApp({
+			data() {
+				return {
+					moves: [],
+					game: 'lobby',
+					state: {},
+					data: {},
+					ws: null,
+				};
+			},
+			methods: {
+				send(moves, data) {
+					return this.ws.send(JSON.stringify({
+						type: 'message',
+						moves: moves && Array.isArray(moves) ? moves : [moves],
+						data,
+					}));
+				},
+				connect() {
+					// for (const [k, v] of Object.entries({"type":"message","moves":["20","use_shuriken"],"game":"the-mind","state":{"round":{"won":false,"lost":false,"play_pile":[]},"round_num":1,"shurikens":1,"lives":3,"won":false,"lost":false,"lobby":{"clients":{"5bbb0abe-9ff2-4d54-991a-d60a8a41838e":{"name":"sheesh","leader":false,"id":"5bbb0abe-9ff2-4d54-991a-d60a8a41838e","joined_at":1659159766662},"b8259a9f-e8fa-4d91-ad7d-d694a758721b":{"name":"woo","leader":false,"id":"b8259a9f-e8fa-4d91-ad7d-d694a758721b","joined_at":1659159771951},"f4e52ff5-2c18-4b4d-9083-b92e9ecf380d":{"name":"pog","leader":true,"id":"f4e52ff5-2c18-4b4d-9083-b92e9ecf380d","joined_at":1659159760886}},"game":"the_mind","id":"xd"},"hand":[20],"other_hands":{"5bbb0abe-9ff2-4d54-991a-d60a8a41838e":5,"b8259a9f-e8fa-4d91-ad7d-d694a758721b":5},"other_hands_exposed":{}}})) {
+					// 	this[k] = v;
+					// }
+					// return;
+					this.ws = new WebSocket(`ws://${location.host}/ws`);
+					this.ws.onopen = () => {
+						console.log('open');
+					};
+					this.ws.onmessage = msg => {
+						const all = JSON.parse(msg.data);
+						console.log(all);
+
+						const { type, game, moves, state, data } = all;
+
+						if (type === 'error') {
+							if ([
+									"lobby no longer exists",
+									"game has ended",
+									"invalid client ID",
+									"you are already connected"].includes(data.message)) {
+								localStorage.removeItem('last_lobby_id');
+								localStorage.removeItem('last_lobby_me');
+							}
+							Toast.create({
+								title: "Error from server",
+								message: data.message,
+								status: TOAST_STATUS.FAILURE,
+								timeout: 5000
+							});
+							return;
+						}
+
+						if (type !== 'message') return;
+
+						if (game === 'lobby') {
+							const id = localStorage.getItem('last_lobby_id');
+							const me = localStorage.getItem('last_lobby_me');
+							if (moves.includes('lobby.reconnect') && id && me) {
+								this.send('lobby.reconnect', { id, me });
+							}
+							if (state) {
+								localStorage.setItem('last_lobby_id', state.id);
+								localStorage.setItem('last_lobby_me', state.me);
+							}
+						}
+
+						this.game = game.replace(/_/g, '-');
+						this.state = state;
+						this.data = data;
+						this.moves = moves;
+					};
+					this.ws.onclose = () => {
+						this.connect();
+					};
+					this.ws.onerror = console.error;
+				},
+			},
+			mounted() {
+				this.connect();
+			},
+		});
+
+		app
+			.component('crown', {
+				template: '<svg width="2rem" xmlns="http://www.w3.org/2000/svg" stroke="currentColor" viewBox="0 0 24 24" class="humbleicons hi-crown"><path xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 18h14M5 14h14l1-9-4 3-4-5-4 5-4-3 1 9z"/></svg>',
+			})
+			.component('heart', {
+				template: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="humbleicons hi-heart"><path xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.574-1.635-4.46-2.135-6.035-.5-1.573 1.635-1.34 3.836 0 5.752C7.306 15.168 9.41 16.89 12 19c2.59-2.11 4.694-3.832 6.035-5.748 1.34-1.916 1.573-4.117 0-5.752C16.46 5.865 13.574 6.365 12 8z"/></svg>',
+			})
+			.component('back-arrow', {
+				template: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" class="humbleicons hi-arrow-go-back"><path xmlns="http://www.w3.org/2000/svg" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 18h3.75a5.25 5.25 0 100-10.5H5M7.5 4L4 7.5 7.5 11"/></svg>',
+			})
+			.component('lobby', {
+				template: '#lobby',
+				data() {
+					return {
+						games: [
+							{
+								name: 'The Mind',
+								id: 'the_mind',
+							},
+							{
+								name: 'War!',
+								id: 'war',
+							}
+						],
+						lobby: '',
+						name: '',
+					}
+				},
+				props: ['state', 'moves', 'data'],
+				emits: ['send'],
+				computed: {
+					playedCards() {
+						return this.state.round.play_pile.map(c => c.card);
+					},
+					orderedClients() {
+						return Object.values(this.state.clients).sort((a, b) => {
+							return a.joined_at - b.joined_at;
+						});
+					},
+					me() {
+						return this.state.clients[this.state.me];
+					},
+				},
+			})
+			.component('lobby-controls', {
+				template: '#lobby-controls',
+				props: ['state', 'moves', 'data'],
+				emits: ['send'],
+			})
+			.component('the-mind', {
+				template: '#the-mind',
+				props: ['state', 'moves', 'data'],
+				emits: ['send'],
+				computed: {
+					reward() {
+						switch (this.data.reward) {
+							case 'shuriken':
+								return '(+1 Shuriken)';
+							case 'life':
+								return '(+1 Life)';
+						}
+
+						return null;
+					},
+					hands() {
+						return [this.state.hand, ...this.otherHands]
+							.map(c => c.sort(
+								(a, b) => (a || Infinity) - (b || Infinity)));
+					},
+					otherHands() {
+						return Object.keys(this.state.other_hands_exposed || {}).length === 0
+							? Object
+									.entries(this.state.other_hands)
+									.map(([k, v]) => {
+										if (this.state.round.lowest_cards && this.state.round.lowest_cards[k]) {
+											return [this.state.round.lowest_cards[k], ...Array(v - 1).fill(null)];
+										}
+
+										return Array(v).fill(null);
+									})
+							: Object.values(this.state.other_hands_exposed);
+					},
+					lastTwoCards() {
+						return this.state.round.play_pile.slice(-2);
+					},
+				},
+			})
+			.component('war', {
+				template: '#war',
+				props: ['state', 'moves', 'data'],
+				emits: ['send'],
+				computed: {
+					placedCards() {
+						return [this.state.placed, ...(this.state.placed_revealed
+							? Object.values(this.state.placed_revealed)
+							: Object.values(this.state.other_placed))];
+					},
+					hands() {
+						return [this.state.hand, ...this.otherHands];
+					},
+					otherHands() {
+						return Object.values(this.state.other_hands).map(c => Array(c).fill(null));
+					},
+				},
+			});
+
+		app.mount('#app');
+	</script>
+</body>
+</html>
