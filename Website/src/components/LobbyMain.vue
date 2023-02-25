@@ -55,7 +55,7 @@ import Clipboard from './icons/IconClipboard.vue';
 								class="kick">{{ client.name }}</span>
 							<span
 								v-else
-								:style="client.leader ? { color: '#cc8f00' } : {}"
+								:style="client.id === me.id ? { color: '#cc8f00' } : {}"
 								:contenteditable="client.id === me.id"
 								spellcheck="false"
 								@keydown.enter="updateName">{{ client.name }}</span>

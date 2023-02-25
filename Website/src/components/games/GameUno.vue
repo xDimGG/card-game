@@ -50,7 +50,7 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		<div
 			v-for="n in 4"
 			:key="n"
-			:class="`circle color-${n - 1} pointer`"
+			:class="`circle color-${n - 1} choice pointer`"
 			@click="$emit('send', `${color_prompt}_${n - 1}`)"></div>
 	</div>
 </template>
@@ -62,6 +62,15 @@ import PlayerHands from '../tools/PlayerHands.vue';
 	border-radius: 100%;
 	border: white 1px solid;
 	margin: 20px;
+}
+
+.circle.choice {
+	transition: box-shadow 0.2s;
+	box-shadow: 0 0 0 white;
+}
+
+.circle.choice:hover {
+	box-shadow: 0 0 16px white;
 }
 
 .color-0 { background-color: #ff5555; }
@@ -137,7 +146,9 @@ export default {
 						return card;
 					});
 
-				return Array(this.state.other_hands[id]).fill(new Card('', true));
+				return Array(this.state.other_hands[id]).fill(new Card('', true, null, {
+					'--card-stripe-color': id === this.state.player_order[this.state.current_player] ? 'white' : null,
+				}));
 			});
 		},
 		convertCard(raw) {

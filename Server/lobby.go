@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sasha-s/go-deadlock"
 )
 
 const (
@@ -27,6 +28,8 @@ type Lobby struct {
 	ID      string                  `json:"id"`
 	Frozen  bool                    `json:"frozen"`
 	game    FreezableGame
+
+	mu deadlock.RWMutex
 }
 
 type LobbyState struct {
@@ -58,7 +61,9 @@ func (l *Lobby) Sync() {
 func (l *Lobby) SyncAfter(t time.Duration) {
 	go func() {
 		time.Sleep(t)
+		l.mu.Lock()
 		l.Sync()
+		l.mu.Unlock()
 	}()
 }
 
@@ -76,49 +81,27 @@ type LobbyClient struct {
 	Disconnected bool   `json:"disconnected"`
 }
 
-func (lm *LobbyManager) disconnect(lobby *Lobby, client *Client) {
-	if lobby.game == nil {
-		// Remove client from lobby
-		if c := lobby.Client(client); c != nil {
-			delete(lobby.Clients, c.ID)
-			lm.clientToLobby.Delete(client)
+// Removes client from given lobby. Does not sync
+func (lm *LobbyManager) remove(lobby *Lobby, client *Client) {
+	// Remove client from lobby
+	if c := lobby.Client(client); c != nil {
+		delete(lobby.Clients, c.ID)
+		lm.clientToLobby.Delete(client)
 
-			if c.Leader && len(lobby.Clients) > 0 {
-				var oldest *LobbyClient
-				for _, nc := range lobby.Clients {
-					if oldest == nil || nc.JoinedAt < oldest.JoinedAt {
-						oldest = nc
-					}
+		if c.Leader && len(lobby.Clients) > 0 {
+			var oldest *LobbyClient
+			for _, nc := range lobby.Clients {
+				if oldest == nil || nc.JoinedAt < oldest.JoinedAt {
+					oldest = nc
 				}
-				oldest.Leader = true
 			}
+			oldest.Leader = true
 		}
+	}
 
-		// Delete lobby if empty
-		if len(lobby.Clients) == 0 {
-			lm.Lobbies.Delete(lobby.ID)
-		}
-	} else {
-		if g, ok := lobby.game.(Game); ok {
-			g.Disconnect(client)
-			return
-		}
-
-		lobby.Frozen = true
-		lobby.Client(client).Disconnected = true
-
-		// Delete lobby if everyone is disconnected
-		someone := false
-		for _, c := range lobby.Clients {
-			if !c.Disconnected {
-				someone = true
-				break
-			}
-		}
-
-		if !someone {
-			lm.Lobbies.Delete(lobby.ID)
-		}
+	// Delete lobby if empty
+	if len(lobby.Clients) == 0 {
+		lm.Lobbies.Delete(lobby.ID)
 	}
 }
 
@@ -181,20 +164,6 @@ func (lm *LobbyManager) LegalMoves(client *Client) (moves []string, extra map[st
 }
 
 func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interface{}) error {
-	lobby := lm.Lobby(client)
-	if lobby == nil {
-		defer func() {
-			// If the user is now in a lobby
-			if lobby := lm.Lobby(client); lobby != nil {
-				lobby.Sync()
-			}
-		}()
-	} else {
-		defer func() {
-			lobby.Sync()
-		}()
-	}
-
 	switch moves[0] {
 	case MoveJoin:
 		lobbyID, _ := Get[string](data, "lobby")
@@ -231,12 +200,16 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			lm.Lobbies.Store(lobbyID, lobby)
 		}
 
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
+
 		if lobby.game != nil {
 			return errors.New("you cannot join a game in progress")
 		}
 
 		lobby.Clients[lc.ID] = lc
 		lm.clientToLobby.Store(client, lobbyID)
+		lobby.Sync()
 
 	case MoveReconnect:
 		lobbyID, _ := Get[string](data, "id")
@@ -246,7 +219,10 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 		if !ok {
 			return errors.New("lobby no longer exists")
 		}
+
 		lobby := entry.(*Lobby)
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
 
 		if lobby.game == nil {
 			return errors.New("game has ended")
@@ -277,8 +253,14 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			lobby.Frozen = false
 		}
 
+		lobby.Sync()
+
 	case MoveDisconnect:
-		lm.disconnect(lobby, client)
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+		lm.remove(lobby, client)
+		lobby.Sync()
+		lobby.mu.Unlock()
 		client.Sync()
 
 	case MoveSelect:
@@ -288,19 +270,27 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			return errors.New("invalid game")
 		}
 
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
 		lobby.Game = &g
+		lobby.Sync()
+		lobby.mu.Unlock()
 
 	case MoveStart:
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
+
 		g := GAMES[*lobby.Game]
-		if g != nil {
-			if len(lobby.Clients) < g.MinPlayers {
-				return errors.New("too few players to start")
-			}
-			if len(lobby.Clients) > g.MaxPlayers {
-				return errors.New("too many players to start")
-			}
-			lobby.game = g.Create(lobby)
+		if len(lobby.Clients) < g.MinPlayers {
+			return errors.New("too few players to start")
 		}
+		if len(lobby.Clients) > g.MaxPlayers {
+			return errors.New("too many players to start")
+		}
+
+		lobby.game = g.Create(lobby)
+		lobby.Sync()
 
 	case MoveRename:
 		name, _ := Get[string](data, "name")
@@ -309,9 +299,17 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			return errors.New("no name provided")
 		}
 
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
 		lobby.Client(client).Name = name
+		lobby.Sync()
+		lobby.mu.Unlock()
 
 	case MoveKick:
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
+
 		id, _ := Get[string](data, "id")
 
 		if id == lobby.Client(client).ID {
@@ -323,11 +321,17 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			return errors.New("invalid ID provided")
 		}
 
+		lm.remove(lobby, target.Client)
+		lobby.Sync()
+
 		target.SendError(errors.New("you have been kicked"))
-		lm.disconnect(lobby, target.Client)
 		target.Sync()
 
 	case MoveTransfer:
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
+
 		id, _ := Get[string](data, "id")
 
 		target, ok := lobby.Clients[id]
@@ -341,8 +345,12 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 
 		lobby.Client(client).Leader = false
 		target.Leader = true
+		lobby.Sync()
 
 	case MoveReturn:
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+		defer lobby.mu.Unlock()
 		lobby.game = nil
 		lobby.Frozen = false
 
@@ -352,9 +360,20 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			}
 		}
 
+		lobby.Sync()
+
 	default:
-		if lobby != nil && lobby.game != nil {
-			return lobby.game.ExecuteMoves(client, moves, data)
+		lobby := lm.Lobby(client)
+		if lobby != nil {
+			lobby.mu.Lock()
+			defer func() {
+				lobby.mu.Unlock()
+				lobby.Sync()
+			}()
+
+			if lobby.game != nil {
+				return lobby.game.ExecuteMoves(client, moves, data)
+			}
 		}
 	}
 
@@ -371,6 +390,7 @@ func (lm *LobbyManager) State(client *Client) interface{} {
 		return lobby.game.State(client)
 	}
 
+	// Maybe copy lobby
 	return LobbyState{
 		Lobby: lobby,
 		Me:    lobby.Client(client).ID,
@@ -383,7 +403,35 @@ func (lm *LobbyManager) Disconnect(client *Client) {
 		return
 	}
 
-	lm.disconnect(lobby, client)
+	lobby.mu.Lock()
+	defer func() {
+		lobby.Sync()
+		lobby.mu.Unlock()
+	}()
 
-	lobby.Sync()
+	if lobby.game == nil {
+		lm.remove(lobby, client)
+		return
+	}
+
+	if g, ok := lobby.game.(Game); ok {
+		g.Disconnect(client)
+		return
+	}
+
+	lobby.Frozen = true
+	lobby.Client(client).Disconnected = true
+
+	// Delete lobby if everyone is disconnected
+	someone := false
+	for _, c := range lobby.Clients {
+		if !c.Disconnected {
+			someone = true
+			break
+		}
+	}
+
+	if !someone {
+		lm.Lobbies.Delete(lobby.ID)
+	}
 }

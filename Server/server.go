@@ -8,6 +8,7 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/gorilla/websocket"
+	"github.com/sasha-s/go-deadlock"
 	"golang.org/x/exp/slices"
 )
 
@@ -21,12 +22,15 @@ type Client struct {
 	Server     *GameServer
 	legalMoves []string
 	closed     bool
+	connMu     deadlock.Mutex // Protect conn
 	conn       *websocket.Conn
 
 	_lastSent []byte
 }
 
 func (c *Client) send(data []byte) error {
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
 	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
@@ -153,7 +157,7 @@ func (s *GameServer) handleWs(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			if len(packet.Moves) > 20 {
+			if len(packet.Moves) > 10 {
 				c.SendError(errors.New("too many moves sent"))
 				continue
 			}

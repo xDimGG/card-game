@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -83,6 +84,18 @@ type Uno struct {
 	unoAt    map[string]int64 // Whenever each player last reached one card
 	drawPile *Pile
 	hands    Hands
+}
+
+// Makes sure the draw pile has at least n cards. If draw pile could
+// not be refilled, (i.e. players have drawn too many cards), this
+// returns false
+func (u *Uno) checkDrawPile(n int) bool {
+	if len(*u.drawPile) < n {
+		u.drawPile.Insert(u.PlayPile.Draw(len(*u.PlayPile) - 1))
+		u.drawPile.Shuffle()
+	}
+
+	return len(*u.drawPile) >= n
 }
 
 type UnoState struct {
@@ -194,7 +207,12 @@ func (g *Uno) ExecuteMoves(client *Client, moves []string, data interface{}) (er
 			g.DrawNum = 0
 		}
 
+		enough := g.checkDrawPile(num)
 		hand.Insert(g.drawPile.Draw(num))
+
+		if !enough {
+			return errors.New("all cards have been drawn")
+		}
 
 	case moveUno:
 		for id, at := range g.unoAt {
@@ -209,6 +227,7 @@ func (g *Uno) ExecuteMoves(client *Client, moves []string, data interface{}) (er
 
 			// If the grace period is over, force draw 2
 			if at+unoGracePeriod < time.Now().UnixMilli() {
+				g.checkDrawPile(2)
 				g.hands[id].Insert(g.drawPile.Draw(2))
 				g.unoAt[id] = 0
 			}
