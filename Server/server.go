@@ -5,10 +5,10 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sync"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/gorilla/websocket"
-	"github.com/sasha-s/go-deadlock"
 	"golang.org/x/exp/slices"
 )
 
@@ -22,7 +22,7 @@ type Client struct {
 	Server     *GameServer
 	legalMoves []string
 	closed     bool
-	connMu     deadlock.Mutex // Protect conn
+	connMu     sync.Mutex // Protect conn
 	conn       *websocket.Conn
 
 	_lastSent []byte

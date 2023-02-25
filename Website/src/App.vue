@@ -33,9 +33,8 @@ export default {
 			}));
 		},
 		connect() {
-			this.ws = new WebSocket(process.env.NODE_ENV === 'development'
-				? 'ws://localhost:8080/ws'
-				: `ws://${location.host}/ws`);
+			const url = `ws${this.secure ? 's' : ''}://${this.dev ? 'localhost:8080' : location.host}/ws`;
+			this.ws = new WebSocket(url);
 			this.ws.onmessage = msg => {
 				const packet = JSON.parse(msg.data);
 
@@ -54,7 +53,7 @@ export default {
 
 				delete packet.type;
 				jmp.apply(this.statePacket, packet);
-				console.log(JSON.parse(JSON.stringify(this.statePacket.state || '{}')));
+				// console.log(JSON.parse(JSON.stringify(this.statePacket.state || '{}')));
 
 				const { game, moves, state } = this.statePacket;
 
@@ -74,6 +73,14 @@ export default {
 			this.ws.onerror = err => {
 				console.error;
 			};
+		},
+	},
+	computed: {
+		dev() {
+			return process.env.NODE_ENV === 'development';
+		},
+		secure() {
+			return location.protocol === 'https:';
 		},
 	},
 	mounted() {

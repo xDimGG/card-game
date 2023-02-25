@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sasha-s/go-deadlock"
 )
 
 const (
@@ -29,7 +28,7 @@ type Lobby struct {
 	Frozen  bool                    `json:"frozen"`
 	game    FreezableGame
 
-	mu deadlock.RWMutex
+	mu sync.RWMutex
 }
 
 type LobbyState struct {

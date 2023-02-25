@@ -11,7 +11,7 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		:state="state" />
 
 	<PlayerHands :hands="placedCards" position="secondary"/>
-	<PlayerHands :hands="hands" position="primary" />
+	<PlayerHands :hands="hands" :names="names" position="primary" />
 	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
 		<span
 			v-for="(score, id) in state.wins"
@@ -59,6 +59,10 @@ export default {
 				...Object.values(this.state.other_hands)
 					.map(c => Array(c).fill(new Card(null, true))),
 			];
+		},
+		names() {
+			const ids = [this.state.me, ...Object.keys(this.state.lobby.clients).filter(k => k !== this.state.me)];
+			return ids.map(id => this.state.lobby.clients[id].name);
 		},
 	},
 };

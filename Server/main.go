@@ -5,13 +5,9 @@ import (
 	"math/rand"
 	"net/http"
 	"time"
-
-	"github.com/sasha-s/go-deadlock"
 )
 
 func main() {
-	deadlock.Opts.DeadlockTimeout = time.Second
-
 	rand.Seed(time.Now().UnixNano())
 
 	gameServer := NewGameServer(&LobbyManager{})

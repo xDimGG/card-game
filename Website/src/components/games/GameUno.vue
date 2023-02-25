@@ -12,7 +12,7 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		:state="state" />
 
 	<div class="uno-cards">
-		<PlayerHands :hands="hands()" :cardShift="10" :cardWidth="70"></PlayerHands>
+		<PlayerHands :names="names" :hands="hands" :activePlayers="activePlayers" :cardShift="10" :cardWidth="70"></PlayerHands>
 	</div>
 
 	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
@@ -34,12 +34,12 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		<button
 			v-if="moves.includes('draw')"
 			class="btn btn-sm btn-light mt-2"
-			@click="$emit('send', 'draw')">Draw {{ Math.max(1, state.draw_num) }}</button>
+			@click="send('draw')">Draw {{ Math.max(1, state.draw_num) }}</button>
 
 		<button
 			v-if="moves.includes('uno')"
 			class="btn btn-sm btn-light mt-2"
-			@click="$emit('send', 'uno')">Uno!</button>
+			@click="send('uno')">Uno!</button>
 
 		<!-- Hidden circle to center everything -->
 		<div class="circle" v-if="state.chosen_color !== -1" style="visibility: hidden;"></div>
@@ -51,7 +51,7 @@ import PlayerHands from '../tools/PlayerHands.vue';
 			v-for="n in 4"
 			:key="n"
 			:class="`circle color-${n - 1} choice pointer`"
-			@click="$emit('send', `${color_prompt}_${n - 1}`)"></div>
+			@click="send(`${color_prompt}_${n - 1}`)"></div>
 	</div>
 </template>
 
@@ -120,8 +120,6 @@ export default {
 		lastTwoCards() {
 			return this.state.play_pile.slice(-2).map(r => this.convertCard(r));
 		},
-	},
-	methods: {
 		hands() {
 			return this.players.map(id => {
 				if (this.state.me === id)
@@ -129,7 +127,7 @@ export default {
 						const card = this.convertCard(raw);
 
 						if (this.moves.includes(raw.toString())) {
-							card.onclick = () => this.$emit('send', raw.toString());
+							card.onclick = () => this.send(raw.toString());
 						} else if (this.moves.includes(`${raw}_0`)) {
 							// Color choosing cards
 							card.onclick = () => {
@@ -146,10 +144,20 @@ export default {
 						return card;
 					});
 
-				return Array(this.state.other_hands[id]).fill(new Card('', true, null, {
-					'--card-stripe-color': id === this.state.player_order[this.state.current_player] ? 'white' : null,
-				}));
+				return Array(this.state.other_hands[id]).fill(new Card('', true));
 			});
+		},
+		names() {
+			return this.players.map(id => this.state.lobby.clients[id].name);
+		},
+		activePlayers() {
+			return [this.players.indexOf(this.state.player_order[this.state.current_player])];
+		},
+	},
+	methods: {
+		send(move) {
+			this.$emit('send', move);
+			this.color_prompt = -1;
 		},
 		convertCard(raw) {
 			const card = new Card();

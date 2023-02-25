@@ -16,6 +16,17 @@ import BackArrow from '../icons/IconBackArrow.vue';
 		@click="$emit('send', 'lobby.return')" />
 </template>
 
+<style>
+.freeze {
+	position: absolute;
+	height: 100vh;
+	width: 100vw;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 9999;
+}
+</style>
+
 <script>
 export default {
 	props: ['state', 'moves', 'data'],

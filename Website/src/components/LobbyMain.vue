@@ -52,10 +52,10 @@ import Clipboard from './icons/IconClipboard.vue';
 							<span
 								v-if="me.leader && !client.leader"
 								@click="$emit('send', 'lobby.kick', { id: client.id })"
-								class="kick">{{ client.name }}</span>
+								class="kick pointer">{{ client.name }}</span>
 							<span
 								v-else
-								:style="client.id === me.id ? { color: '#cc8f00' } : {}"
+								:style="client.id === me.id ? { color: 'var(--yellow)' } : {}"
 								:contenteditable="client.id === me.id"
 								spellcheck="false"
 								@keydown.enter="updateName">{{ client.name }}</span>
@@ -79,6 +79,26 @@ import Clipboard from './icons/IconClipboard.vue';
 		</div>
 	</main>
 </template>
+
+<style>
+.kick:hover {
+	text-decoration: line-through;
+}
+
+.transfer-crown {
+	fill: none;
+	color: #ccc;
+	cursor: pointer;
+}
+
+.transfer-crown:hover {
+	color: #000;
+}
+
+.white-shadow {
+	box-shadow: 0 0 2rem rgb(255 255 255 / 38%) !important;
+}
+</style>
 
 <script>
 import { useToast } from 'vue-toastification';

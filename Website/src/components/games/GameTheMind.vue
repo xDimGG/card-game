@@ -56,7 +56,7 @@ import Heart from '../icons/IconHeart.vue';
 			@click="$emit('send', 'use_shuriken')">Use shuriken</button>
 	</div>
 
-	<PlayerHands :hands="hands" />
+	<PlayerHands :hands="hands" :names="names" />
 </template>
 
 <script>
@@ -93,7 +93,7 @@ export default {
 				? Object
 					.entries(this.state.other_hands)
 					.map(([k, v]) => {
-						if (this.state.round.lowest_cards && this.state.round.lowest_cards[k]) {
+						if (this.state.round.lowest_cards?.[k]) {
 							return [this.state.round.lowest_cards[k], ...Array(v - 1).fill(null)];
 						}
 
@@ -103,6 +103,10 @@ export default {
 		},
 		lastTwoCards() {
 			return this.state.round.play_pile.slice(-2);
+		},
+		names() {
+			const ids = [this.state.me, ...Object.keys(this.state.lobby.clients).filter(k => k !== this.state.me)];
+			return ids.map(id => this.state.lobby.clients[id].name);
 		},
 	},
 };

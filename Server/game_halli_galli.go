@@ -24,6 +24,7 @@ type HG struct {
 	CurrentPlayer int             `json:"current_player"` // Whose turn is it
 	PlayerOrder   []string        `json:"player_order"`   // What order do players play in
 	PlayedCards   Hands           `json:"played_cards"`   // What cards have been played so far
+	Winner        string          `json:"winner,omitempty"`
 
 	hands Hands
 }
@@ -98,17 +99,24 @@ func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) e
 			h.Shuffle()
 			game.CurrentPlayer = slices.Index(game.PlayerOrder, c.ID)
 
+			nOut := 0
+			winner := ""
 			for id, cards := range game.hands {
 				if len(*cards) == 0 {
+					nOut += 1
 					game.Out[id] = true
+				} else {
+					winner = id
 				}
+			}
+
+			// If all but 1 players is out
+			if nOut == len(game.Lobby.Clients)-1 {
+				game.Winner = winner
 			}
 		} else {
 			for id := range game.Lobby.Clients {
 				if id != c.ID {
-					if len(*h) == 0 {
-						break
-					}
 					o := game.hands[id]
 					o.Insert(h.Draw(1))
 				}
@@ -126,16 +134,8 @@ func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) e
 func (game *HG) LegalMoves(client *Client) (moves []string, _ map[string]interface{}) {
 	c := game.Lobby.Client(client)
 
-	remaining := 0
-
-	for _, out := range game.Out {
-		if !out {
-			remaining++
-		}
-	}
-
-	if remaining < 2 {
-		return
+	if game.Winner != "" {
+		return []string{MoveReturn}, nil
 	}
 
 	if game.Out[c.ID] {

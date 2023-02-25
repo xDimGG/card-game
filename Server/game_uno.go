@@ -283,6 +283,10 @@ func (g *Uno) ExecuteMoves(client *Client, moves []string, data interface{}) (er
 }
 
 func (g *Uno) LegalMoves(client *Client) (moves []string, extra map[string]interface{}) {
+	if len(g.Winners) >= 1 {
+		moves = append(moves, MoveReturn)
+	}
+
 	c := g.Lobby.Client(client)
 	for id, at := range g.unoAt {
 		if at == 0 {

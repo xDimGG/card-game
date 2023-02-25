@@ -68,6 +68,7 @@ type TheMindState struct {
 	Hand              []int          `json:"hand"`
 	OtherHands        map[string]int `json:"other_hands"`
 	OtherHandsExposed Hands          `json:"other_hands_exposed"`
+	Me                string         `json:"me"`
 }
 
 func NewTheMind(lobby *Lobby) FreezableGame {
@@ -132,6 +133,7 @@ func (game *TheMind) State(client *Client) interface{} {
 	s := &TheMindState{
 		TheMind: *game,
 		Hand:    *game.hands[lc.ID],
+		Me:      lc.ID,
 	}
 
 	if game.Round.Lost || game.Round.Won {
@@ -145,7 +147,7 @@ func (game *TheMind) State(client *Client) interface{} {
 
 func (game *TheMind) LegalMoves(client *Client) ([]string, map[string]interface{}) {
 	if game.Won || game.Lost {
-		return []string{moveRestartGame}, nil
+		return []string{moveRestartGame, MoveReturn}, nil
 	}
 
 	if game.Round.Won {

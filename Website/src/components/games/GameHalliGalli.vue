@@ -11,7 +11,9 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		:state="state" />
 
 	<PlayerHands :hands="playedCards" position="secondary" :limit="1" :ltr="false" />
-	<PlayerHands :hands="hands" :cardShift="55" :ltr="false" />
+	<div class="hg-cards">
+		<PlayerHands :hands="hands" :names="names" :activePlayers="activePlayers" :cardShift="55" :ltr="false" />
+	</div>
 
 	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
 		<span
@@ -23,10 +25,12 @@ import PlayerHands from '../tools/PlayerHands.vue';
 </template>
 
 <style>
-@media only screen and (max-width: 600px) {
-	.pos-2, .pos-3 {
-		--hand--offset: -40px !important;
-	}
+.hg-cards .hand.pos-0 > .playing-card {
+	--card-stripe-color: #006bff;
+}
+
+.hg-cards .hand > .playing-card {
+	color: white;
 }
 </style>
 
@@ -46,18 +50,12 @@ export default {
 		},
 		hands() {
 			return this.players.map(id => {
-				const active = id === this.state.player_order[this.state.current_player];
-				const myTurn = this.moves.includes('draw') && active;
-
-				const style = { color: 'white' };
-				if (active) style['box-shadow'] = '0 0 10px 0px #c1c1c1';
-				if (this.state.me === id) style['--card-stripe-color'] = '#006bff';
+				const myTurn = id === this.state.player_order[this.state.current_player] && this.moves.includes('draw');
 
 				return Array(this.state.hands[id]).fill(new Card(
 					`×${this.state.hands[id]}`,
 					true,
-					myTurn ? () => this.$emit('send', 'draw') : null,
-					style,
+					myTurn ? () => this.$emit('send', 'draw') : null
 				));
 			});
 		},
@@ -66,6 +64,12 @@ export default {
 				const played = this.state.played_cards[id];
 				return played.map(c => new Card(this.cardToString(c)));
 			});
+		},
+		names() {
+			return this.players.map(id => this.state.lobby.clients[id].name);
+		},
+		activePlayers() {
+			return [this.players.indexOf(this.state.player_order[this.state.current_player])];
 		},
 	},
 	methods: {

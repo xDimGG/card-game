@@ -8,10 +8,10 @@ require github.com/google/uuid v1.3.0
 
 require golang.org/x/exp v0.0.0-20230203172020-98cc5a0785f9
 
-require (
-	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
-	github.com/sasha-s/go-deadlock v0.3.1 // indirect
-)
+// require (
+// 	github.com/petermattis/goid v0.0.0-20180202154549-b0b1615b78e5 // indirect
+// 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
+// )
 
 require (
 	github.com/evanphx/json-patch v0.5.2

@@ -36,6 +36,7 @@ type WarState struct {
 	PlacedRevealed map[string]int  `json:"placed_revealed"`
 	Hand           []int           `json:"hand"`
 	OtherHands     map[string]int  `json:"other_hands"`
+	Me             string          `json:"me"`
 }
 
 func NewWar(l *Lobby) FreezableGame {
@@ -107,15 +108,20 @@ func (game *War) ExecuteMoves(client *Client, moves []string, data interface{}) 
 }
 
 func (game *War) LegalMoves(client *Client) ([]string, map[string]interface{}) {
+	c := game.Lobby.Client(client)
+
 	if game.phase == WarPhaseReady {
 		return []string{moveWar}, nil
 	}
 
 	if game.phase == WarPhaseReveal {
+		if len(*game.hands[c.ID]) == 0 {
+			return []string{MoveReturn}, nil
+		}
+
 		return []string{moveNextRound}, nil
 	}
 
-	c := game.Lobby.Client(client)
 	if _, ok := game.placed[c.ID]; ok {
 		return nil, nil
 	}
@@ -140,6 +146,7 @@ func (game *War) State(client *Client) interface{} {
 		Placed:     game.placed[c.ID],
 		Hand:       *game.hands[c.ID],
 		OtherHands: game.hands.StateHidden(c.ID),
+		Me:         c.ID,
 	}
 
 	if game.phase == WarPhasePreparation || game.phase == WarPhaseReady {
