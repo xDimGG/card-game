@@ -3,9 +3,11 @@ import CardPile from './CardPile.vue';
 
 export default {
 	// Hands: [][]Card
-	// Position: primary|secondary
+	// Names: []String
+	// Position: 'primary'|'secondary'
 	props: {
 		hands: Array,
+		names: Array,
 		ltr: Boolean,
 		position: {
 			type: String,
@@ -56,6 +58,7 @@ export default {
 			'--hand-half-width': `${(cardWidth + (cardWidth - computeCardShift(i)) * (len(hand) - 1)) / 2}px`,
 			'--hand-half-width-raw': `${cardWidth * len(hand) / 2}px`,
 		}">
+		<span v-if="names">{{ name[i] }}</span>
 		<CardPile :cards="hand" :limit="limit" :cardShift="computeCardShift(i)" :ltr="ltr"></CardPile>
 	</div>
 </template>
