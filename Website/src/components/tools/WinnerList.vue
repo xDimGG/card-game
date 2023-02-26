@@ -50,10 +50,13 @@ export default {
 	font-size: 1.75rem;
 }
 
+#place-0 {
+	margin-top: -50px;
+}
+
 #place-0 > span {
 	color: var(--yellow);
 	font-size: 4rem;
-	margin-top: -50px;
 }
 
 #place-1 > span {

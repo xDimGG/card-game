@@ -366,8 +366,8 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 		if lobby != nil {
 			lobby.mu.Lock()
 			defer func() {
-				lobby.mu.Unlock()
 				lobby.Sync()
+				lobby.mu.Unlock()
 			}()
 
 			if lobby.game != nil {
