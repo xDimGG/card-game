@@ -116,7 +116,7 @@ func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) e
 			}
 		} else {
 			for id := range game.Lobby.Clients {
-				if id != c.ID {
+				if !game.Out[id] && id != c.ID {
 					o := game.hands[id]
 					o.Insert(h.Draw(1))
 				}

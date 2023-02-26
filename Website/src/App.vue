@@ -53,7 +53,7 @@ export default {
 
 				delete packet.type;
 				jmp.apply(this.statePacket, packet);
-				// console.log(JSON.parse(JSON.stringify(this.statePacket.state || '{}')));
+				console.log(JSON.parse(JSON.stringify(this.statePacket.state || '{}')));
 
 				const { game, moves, state } = this.statePacket;
 

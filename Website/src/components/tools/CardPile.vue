@@ -76,11 +76,16 @@ export default {
 	border-color: white;
 }
 
+.hand.pos-0 > .playing-card {
+	--card-stripe-color: #006bff;
+}
+
 .playing-card.inactive {
 	filter: brightness(0.5);
 }
 
 .playing-card.back {
+	color: #ffffff;
 	background-color: #000000;
 	background-size: 10px 10px;
 	background-image: repeating-linear-gradient(45deg, #000000 0, var(--card-stripe-color) 1px, #000000 0, #000000 50%);

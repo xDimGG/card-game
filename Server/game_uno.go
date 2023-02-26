@@ -115,6 +115,7 @@ func NewUno(l *Lobby) FreezableGame {
 		Lobby:       l,
 		Clockwise:   true,
 		ChosenColor: -1,
+		Winners:     []string{},
 		unoAt:       make(map[string]int64),
 		drawPile:    p,
 		hands:       Hands{},

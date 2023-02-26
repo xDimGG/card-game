@@ -2,6 +2,7 @@
 import Card from '../../Card';
 import LobbyControls from '../tools/LobbyControls.vue';
 import PlayerHands from '../tools/PlayerHands.vue';
+import WinnerList from '../tools/WinnerList.vue';
 </script>
 
 <template>
@@ -15,7 +16,9 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		<PlayerHands :names="names" :hands="hands" :activePlayers="activePlayers" :cardShift="10" :cardWidth="70"></PlayerHands>
 	</div>
 
-	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+	<div class="game-center">
+		<WinnerList v-if="state.winners.length > 0" :winners="winners" />
+
 		<div :class="`circle color-${state.chosen_color}`" v-if="state.chosen_color !== -1"></div>
 
 		<div class="hand uno-cards">
@@ -152,6 +155,9 @@ export default {
 		},
 		activePlayers() {
 			return [this.players.indexOf(this.state.player_order[this.state.current_player])];
+		},
+		winners() {
+			return this.state.winners.map(w => this.state.lobby.clients[w].name);
 		},
 	},
 	methods: {

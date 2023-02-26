@@ -36,6 +36,7 @@ type WarState struct {
 	PlacedRevealed map[string]int  `json:"placed_revealed"`
 	Hand           []int           `json:"hand"`
 	OtherHands     map[string]int  `json:"other_hands"`
+	GameOver       bool            `json:"game_over"`
 	Me             string          `json:"me"`
 }
 
@@ -164,6 +165,10 @@ func (game *War) State(client *Client) interface{} {
 			if c.ID != id {
 				ws.PlacedRevealed[id] = game.placed[id]
 			}
+		}
+
+		if len(*ws.hands[c.ID]) == 0 {
+			ws.GameOver = true
 		}
 	}
 

@@ -12,7 +12,7 @@ import Heart from '../icons/IconHeart.vue';
 		:moves="moves"
 		:state="state" />
 
-	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+	<div class="game-center">
 		<div class="hand">
 			<div
 				v-for="(card, i) in lastTwoCards"

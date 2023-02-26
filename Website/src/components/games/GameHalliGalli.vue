@@ -1,6 +1,7 @@
 <script setup>
 import LobbyControls from '../tools/LobbyControls.vue';
 import PlayerHands from '../tools/PlayerHands.vue';
+import WinnerList from '../tools/WinnerList.vue';
 </script>
 
 <template>
@@ -15,7 +16,8 @@ import PlayerHands from '../tools/PlayerHands.vue';
 		<PlayerHands :hands="hands" :names="names" :activePlayers="activePlayers" :cardShift="55" :ltr="false" />
 	</div>
 
-	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+	<div class="game-center">
+		<WinnerList v-if="state.winner" :winners="[state.lobby.clients[state.winner].name]" />
 		<span
 			v-if="moves.includes('press')"
 			class="pointer"
@@ -23,16 +25,6 @@ import PlayerHands from '../tools/PlayerHands.vue';
 			@click="$emit('send', 'press')">🛎️</span>
 	</div>
 </template>
-
-<style>
-.hg-cards .hand.pos-0 > .playing-card {
-	--card-stripe-color: #006bff;
-}
-
-.hg-cards .hand > .playing-card {
-	color: white;
-}
-</style>
 
 <script>
 import Card from '../../Card';

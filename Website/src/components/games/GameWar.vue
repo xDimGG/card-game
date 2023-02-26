@@ -1,6 +1,7 @@
 <script setup>
 import LobbyControls from '../tools/LobbyControls.vue';
 import PlayerHands from '../tools/PlayerHands.vue';
+import WinnerList from '../tools/WinnerList.vue';
 </script>
 
 <template>
@@ -12,10 +13,13 @@ import PlayerHands from '../tools/PlayerHands.vue';
 
 	<PlayerHands :hands="placedCards" position="secondary"/>
 	<PlayerHands :hands="hands" :names="names" position="primary" />
-	<div class="d-flex h-100 w-100 justify-content-center align-items-center flex-column">
+	<div class="game-center">
+		<WinnerList v-if="state.game_over" :winners="winners" />
 		<span
+			v-else
 			v-for="(score, id) in state.wins"
 			:key="id">{{ state.lobby.clients[id].name }}: {{ score }}</span>
+
 		<button
 			v-if="moves.includes('next_round')"
 			class="btn btn-sm btn-light mt-2"
@@ -63,6 +67,17 @@ export default {
 		names() {
 			const ids = [this.state.me, ...Object.keys(this.state.lobby.clients).filter(k => k !== this.state.me)];
 			return ids.map(id => this.state.lobby.clients[id].name);
+		},
+		winners() {
+			const best = Object.values(this.state.wins).sort((a, b) => a - b);
+			const winners = {};
+			for (const [id, wins] of Object.entries(this.state.wins)) {
+				const pos = best.indexOf(wins);
+				if (!winners[pos]) winners[pos] = [];
+				winners[pos].push(this.state.lobby.clients[id].name);
+			}
+
+			return winners;
 		},
 	},
 };
