@@ -23,6 +23,12 @@ type Game interface {
 	Disconnect(client *Client)
 }
 
+type SmartGame interface {
+	FreezableGame
+	// A function to control bots playing this game
+	SelectMoves(client *Client, moves []string) []string
+}
+
 type GameData struct {
 	Create     func(*Lobby) FreezableGame
 	Name       string

@@ -69,7 +69,7 @@ export default {
 			return ids.map(id => this.state.lobby.clients[id].name);
 		},
 		winners() {
-			const best = Object.values(this.state.wins).sort((a, b) => a - b);
+			const best = Object.values(this.state.wins).sort((a, b) => b - a);
 			const winners = {};
 			for (const [id, wins] of Object.entries(this.state.wins)) {
 				const pos = best.indexOf(wins);

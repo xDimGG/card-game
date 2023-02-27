@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -339,6 +340,26 @@ func (g *Uno) State(client *Client) interface{} {
 		OtherHands: g.hands.StateHidden(c.ID),
 		Me:         c.ID,
 	}
+}
+
+func (g *Uno) SelectMoves(client *Client, moves []string) []string {
+	for _, m := range moves {
+		if m != moveDraw && m != moveUno {
+			return []string{m}
+		}
+	}
+
+	if moves[0] == moveUno {
+		if rand.Float32() < 0.3 {
+			return []string{moveUno}
+		}
+	}
+
+	if moves[0] == moveDraw {
+		return []string{moveDraw}
+	}
+
+	return []string{}
 }
 
 func init() {

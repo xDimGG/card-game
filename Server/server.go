@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -24,6 +25,7 @@ type Client struct {
 	closed     bool
 	connMu     sync.Mutex // Protect conn
 	conn       *websocket.Conn
+	bot        bool
 
 	_lastSent []byte
 }
@@ -35,6 +37,10 @@ func (c *Client) send(data []byte) error {
 }
 
 func (c *Client) Send(p *Packet) {
+	if c.bot {
+		return
+	}
+
 	data, err := json.Marshal(p)
 	if err != nil {
 		log.Println("Unmarsahal:", err)
@@ -93,6 +99,8 @@ func (c *Client) Sync() {
 		moves = []string{}
 	}
 	c.legalMoves = moves
+	fmt.Println(c.legalMoves, c.bot)
+
 	c.Send(&Packet{
 		Type:  PacketTypeMessage,
 		Moves: moves,

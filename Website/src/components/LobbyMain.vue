@@ -71,10 +71,15 @@ import Clipboard from './icons/IconClipboard.vue';
 					:class="`btn btn-sm ${game.id === state.game ? 'bg-success' : 'bg-dark'} border-2 mx-1`"
 					:style="{ color: '#fff !important' }">{{ game.name }}</button>
 			</div>
-			<div v-if="moves.includes('lobby.start')">
+			<div>
 				<button
+					v-if="moves.includes('lobby.start')"
 					@click="$emit('send', 'lobby.start')"
-					class="btn btn-sm border-success bg-success btn-secondary mt-2">Start</button>
+					class="btn btn-sm border-success bg-success btn-secondary mt-2 mx-1">Start</button>
+				<button
+					v-if="moves.includes('lobby.add_bot')"
+					@click="$emit('send', 'lobby.add_bot')"
+					class="btn btn-sm border-success btn-dark mt-2 mx-1">Add Bot</button>
 			</div>
 		</div>
 	</main>
@@ -109,20 +114,20 @@ export default {
 		return {
 			games: [
 				{
-					name: 'The Mind',
-					id: 'the_mind',
-				},
-				{
-					name: 'War!',
-					id: 'war',
-				},
-				{
 					name: '¡Uno!',
 					id: 'uno',
 				},
 				{
 					name: 'Halli Galli',
 					id: 'halli_galli',
+				},
+				{
+					name: 'The Mind',
+					id: 'the_mind',
+				},
+				{
+					name: 'War!',
+					id: 'war',
 				},
 			],
 			lobby: location.hash.slice(1),

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,7 @@ const (
 	MoveKick       = "lobby.kick"
 	MoveTransfer   = "lobby.transfer"
 	MoveReturn     = "lobby.return"
+	MoveAddBot     = "lobby.add_bot"
 )
 
 type Lobby struct {
@@ -66,6 +68,51 @@ func (l *Lobby) SyncAfter(t time.Duration) {
 	}()
 }
 
+func (lm *LobbyManager) RunBotRoutine(c *Client) {
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			l := lm.Lobby(c)
+			// If we are no longer in the lobby, end the routine
+			if l == nil {
+				break
+			}
+
+			l.mu.RLock()
+			lc := l.Client(c)
+
+			// If there is no game do nothing
+			if l.game == nil {
+				l.mu.RUnlock()
+				continue
+			}
+
+			legalMoves := []string{}
+			for _, m := range lc.legalMoves {
+				if !strings.HasPrefix(m, "lobby.") {
+					legalMoves = append(legalMoves, m)
+				}
+			}
+
+			if len(legalMoves) == 0 {
+				l.mu.RUnlock()
+				continue
+			}
+
+			var chosenMoves []string
+			if smart, ok := lc.Server.game.(SmartGame); ok {
+				chosenMoves = smart.SelectMoves(lc.Client, legalMoves)
+			} else {
+				// Not-so-smart random legal move algorithm
+				chosenMoves = []string{legalMoves[rand.Intn(len(legalMoves))]}
+			}
+
+			l.mu.RUnlock()
+			lm.ExecuteMoves(lc.Client, chosenMoves, nil)
+		}
+	}()
+}
+
 type LobbyManager struct {
 	Lobbies       sync.Map
 	clientToLobby sync.Map
@@ -78,6 +125,7 @@ type LobbyClient struct {
 	ID           string `json:"id"`
 	JoinedAt     int64  `json:"joined_at"`
 	Disconnected bool   `json:"disconnected"`
+	Bot          bool   `json:"bot"`
 }
 
 // Removes client from given lobby. Does not sync
@@ -87,19 +135,34 @@ func (lm *LobbyManager) remove(lobby *Lobby, client *Client) {
 		delete(lobby.Clients, c.ID)
 		lm.clientToLobby.Delete(client)
 
-		if c.Leader && len(lobby.Clients) > 0 {
+		if c.Leader {
 			var oldest *LobbyClient
 			for _, nc := range lobby.Clients {
+				if nc.bot {
+					continue
+				}
+
 				if oldest == nil || nc.JoinedAt < oldest.JoinedAt {
 					oldest = nc
 				}
 			}
-			oldest.Leader = true
+
+			if oldest != nil {
+				oldest.Leader = true
+			}
 		}
 	}
 
-	// Delete lobby if empty
-	if len(lobby.Clients) == 0 {
+	// Delete lobby if there are no humans
+	someone := false
+	for _, c := range lobby.Clients {
+		if !c.bot {
+			someone = true
+			break
+		}
+	}
+
+	if !someone {
 		lm.Lobbies.Delete(lobby.ID)
 	}
 }
@@ -156,7 +219,7 @@ func (lm *LobbyManager) LegalMoves(client *Client) (moves []string, extra map[st
 			moves = append(moves, MoveStart)
 		}
 
-		return append(moves, MoveKick, MoveTransfer, MoveSelect, MoveRename, MoveDisconnect), nil
+		return append(moves, MoveAddBot, MoveKick, MoveTransfer, MoveSelect, MoveRename, MoveDisconnect), nil
 	}
 
 	return []string{MoveRename, MoveDisconnect}, nil
@@ -342,6 +405,10 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			return errors.New("client is already leader")
 		}
 
+		if target.Bot {
+			return errors.New("cannot make bot leader")
+		}
+
 		lobby.Client(client).Leader = false
 		target.Leader = true
 		lobby.Sync()
@@ -360,6 +427,29 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 		}
 
 		lobby.Sync()
+
+	case MoveAddBot:
+		lobby := lm.Lobby(client)
+		lobby.mu.Lock()
+
+		lc := &LobbyClient{
+			Client: &Client{
+				Server:     NewGameServer(lm),
+				legalMoves: []string{},
+				conn:       nil,
+				bot:        true,
+			},
+			Name:     "bot",
+			ID:       uuid.New().String(),
+			JoinedAt: time.Now().UnixMilli(),
+			Bot:      true,
+		}
+
+		lobby.Clients[lc.ID] = lc
+		lm.clientToLobby.Store(lc.Client, lobby.ID)
+		lobby.Sync()
+		lobby.mu.Unlock()
+		lm.RunBotRoutine(lc.Client)
 
 	default:
 		lobby := lm.Lobby(client)
@@ -421,10 +511,10 @@ func (lm *LobbyManager) Disconnect(client *Client) {
 	lobby.Frozen = true
 	lobby.Client(client).Disconnected = true
 
-	// Delete lobby if everyone is disconnected
+	// Delete lobby if every human is disconnected
 	someone := false
 	for _, c := range lobby.Clients {
-		if !c.Disconnected {
+		if !c.Disconnected && !c.bot {
 			someone = true
 			break
 		}
