@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -99,7 +98,6 @@ func (c *Client) Sync() {
 		moves = []string{}
 	}
 	c.legalMoves = moves
-	fmt.Println(c.legalMoves, c.bot)
 
 	c.Send(&Packet{
 		Type:  PacketTypeMessage,
