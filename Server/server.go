@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -119,6 +120,18 @@ func NewGameServer(game Game) *GameServer {
 }
 
 func (s *GameServer) handleWs(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		// Just to make sure the server won't crash
+		if r := recover(); r != nil {
+			fmt.Println("recovered error in handleWs")
+			if err, ok := r.(error); ok {
+				fmt.Println(err.Error())
+			} else {
+				fmt.Println(r)
+			}
+		}
+	}()
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade:", err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -463,6 +464,19 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 		if lobby != nil {
 			lobby.mu.Lock()
 			defer func() {
+				if r := recover(); r != nil {
+					fmt.Println("error encountered in", *lobby.Game)
+					if err, ok := r.(error); ok {
+						fmt.Println(err.Error())
+					} else {
+						fmt.Println(r)
+					}
+
+					lobby.game = nil
+					for _, c := range lobby.Clients {
+						c.SendError(errors.New("the game has encountered an error"))
+					}
+				}
 				lobby.Sync()
 				lobby.mu.Unlock()
 			}()
