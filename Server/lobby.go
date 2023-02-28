@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"math/rand"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -71,7 +72,8 @@ func (l *Lobby) SyncAfter(t time.Duration) {
 func (lm *LobbyManager) RunBotRoutine(c *Client) {
 	go func() {
 		for {
-			time.Sleep(time.Second)
+			time.Sleep(time.Millisecond * 1500)
+
 			l := lm.Lobby(c)
 			// If we are no longer in the lobby, end the routine
 			if l == nil {
@@ -82,7 +84,7 @@ func (lm *LobbyManager) RunBotRoutine(c *Client) {
 			lc := l.Client(c)
 
 			// If there is no game do nothing
-			if l.game == nil {
+			if l.game == nil || len(lc.legalMoves) == 0 {
 				l.mu.RUnlock()
 				continue
 			}
@@ -100,11 +102,16 @@ func (lm *LobbyManager) RunBotRoutine(c *Client) {
 			}
 
 			var chosenMoves []string
-			if smart, ok := lc.Server.game.(SmartGame); ok {
+			if smart, ok := l.game.(SmartGame); ok {
 				chosenMoves = smart.SelectMoves(lc.Client, legalMoves)
 			} else {
 				// Not-so-smart random legal move algorithm
 				chosenMoves = []string{legalMoves[rand.Intn(len(legalMoves))]}
+			}
+
+			if len(chosenMoves) == 0 {
+				l.mu.RUnlock()
+				continue
 			}
 
 			l.mu.RUnlock()
@@ -439,7 +446,7 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 				conn:       nil,
 				bot:        true,
 			},
-			Name:     "bot",
+			Name:     "Bot " + strconv.Itoa(len(lobby.Clients)),
 			ID:       uuid.New().String(),
 			JoinedAt: time.Now().UnixMilli(),
 			Bot:      true,

@@ -175,6 +175,16 @@ func (game *War) State(client *Client) interface{} {
 	return ws
 }
 
+func (*War) SelectMoves(client *Client, moves []string) []string {
+	for _, m := range moves {
+		if m != moveWar && m != moveNextRound {
+			return []string{m}
+		}
+	}
+
+	return []string{}
+}
+
 func init() {
 	registerGame(&GameData{
 		Create:     NewWar,
