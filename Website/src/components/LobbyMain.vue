@@ -82,6 +82,9 @@ import Clipboard from './icons/IconClipboard.vue';
 					class="btn btn-sm border-success btn-dark mt-2 mx-1">Add Bot</button>
 			</div>
 		</div>
+		<a href="https://github.com/xDimGG/card-game" target="_blank" class="gh-icon">
+			<GitHub />
+		</a>
 	</main>
 </template>
 
@@ -106,6 +109,7 @@ import Clipboard from './icons/IconClipboard.vue';
 </style>
 
 <script>
+import GitHub from './icons/IconGitHub.vue';
 import { useToast } from 'vue-toastification';
 const toast = useToast();
 
@@ -178,5 +182,6 @@ export default {
 			this.$forceUpdate();
 		},
 	},
+	components: { GitHub },
 };
 </script>
