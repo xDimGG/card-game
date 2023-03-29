@@ -89,8 +89,13 @@ import WinnerList from '../tools/WinnerList.vue';
 	}
 }
 
+@keyframes moz-bug-patch {
+	from { width: 69px; }
+	to { width: 70px; }
+}
+
 .uno-cards .playing-card {
-	--card-width: 70px;
+	animation: moz-bug-patch 0.01s forwards; /* idunno */
 	--card-height: 102px;
 	border-radius: 10px;
 }

@@ -21,7 +21,7 @@ import WinnerList from '../tools/WinnerList.vue';
 		<span
 			v-if="moves.includes('press')"
 			class="pointer"
-			style="font-size: 5rem; user-select: none;"
+			style="font-size: 3rem; user-select: none;"
 			@click="$emit('send', 'press')">🛎️</span>
 	</div>
 </template>
