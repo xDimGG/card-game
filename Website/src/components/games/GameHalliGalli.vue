@@ -36,7 +36,7 @@ export default {
 	computed: {
 		players() {
 			let order = this.state.player_order;
-			const me = order.indexOf(this.state.me);
+			const me = order.indexOf(this.state.lobby.me);
 			order = order.slice(me).concat(order.slice(0, me));
 			return reorder(order);
 		},

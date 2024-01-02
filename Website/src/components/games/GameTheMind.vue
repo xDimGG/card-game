@@ -105,7 +105,7 @@ export default {
 			return this.state.round.play_pile.slice(-2);
 		},
 		names() {
-			const ids = [this.state.me, ...Object.keys(this.state.lobby.clients).filter(k => k !== this.state.me)];
+			const ids = [this.state.lobby.me, ...Object.keys(this.state.lobby.clients).filter(k => k !== this.state.lobby.me)];
 			return ids.map(id => this.state.lobby.clients[id].name);
 		},
 	},

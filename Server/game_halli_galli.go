@@ -19,13 +19,13 @@ const (
 )
 
 type HG struct {
-	Lobby         *Lobby          `json:"lobby"`
 	Out           map[string]bool `json:"out"`            // Which players are out
 	CurrentPlayer int             `json:"current_player"` // Whose turn is it
 	PlayerOrder   []string        `json:"player_order"`   // What order do players play in
 	PlayedCards   Hands           `json:"played_cards"`   // What cards have been played so far
 	Winner        string          `json:"winner,omitempty"`
 
+	lobby *Lobby
 	hands Hands
 }
 
@@ -33,11 +33,11 @@ type HGState struct {
 	HG
 
 	Hands map[string]int `json:"hands"` // All player hands
-	Me    string         `json:"me"`
+	Lobby *LobbyState    `json:"lobby"`
 }
 
 func NewHG(l *Lobby) FreezableGame {
-	g := &HG{Lobby: l}
+	g := &HG{lobby: l}
 	pile := CreatePile(56, true)
 	pile.Shuffle()
 
@@ -45,7 +45,7 @@ func NewHG(l *Lobby) FreezableGame {
 	g.Out = make(map[string]bool)
 	g.PlayedCards = Hands{}
 	g.PlayerOrder = []string{}
-	for id := range g.Lobby.Clients {
+	for id := range g.lobby.Clients {
 		g.hands[id] = &Pile{}
 		g.PlayedCards[id] = &Pile{}
 		g.Out[id] = false
@@ -70,7 +70,7 @@ func (game *HG) Advance() {
 }
 
 func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) error {
-	c := game.Lobby.Client(client)
+	c := game.lobby.Client(client)
 
 	switch moves[0] {
 	case moveDraw:
@@ -111,11 +111,11 @@ func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) e
 			}
 
 			// If all but 1 players is out
-			if nOut == len(game.Lobby.Clients)-1 {
+			if nOut == len(game.lobby.Clients)-1 {
 				game.Winner = winner
 			}
 		} else {
-			for id := range game.Lobby.Clients {
+			for id := range game.lobby.Clients {
 				if !game.Out[id] && id != c.ID {
 					o := game.hands[id]
 					o.Insert(h.Draw(1))
@@ -132,7 +132,7 @@ func (game *HG) ExecuteMoves(client *Client, moves []string, data interface{}) e
 }
 
 func (game *HG) LegalMoves(client *Client) (moves []string, _ map[string]interface{}) {
-	c := game.Lobby.Client(client)
+	c := game.lobby.Client(client)
 
 	if game.Winner != "" {
 		return []string{MoveReturn}, nil
@@ -165,7 +165,7 @@ func (*HG) Name(client *Client) string {
 func (game *HG) State(client *Client) interface{} {
 	return &HGState{
 		HG:    *game,
-		Me:    game.Lobby.Client(client).ID,
+		Lobby: game.lobby.State(client),
 		Hands: game.hands.StateHidden(""),
 	}
 }

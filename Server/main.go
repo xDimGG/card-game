@@ -2,19 +2,17 @@ package main
 
 import (
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	gameServer := NewGameServer(&LobbyManager{})
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("dist/")))
 	mux.HandleFunc("/ws", gameServer.handleWs)
+	mux.HandleFunc("/chat", handleChatWs)
 
 	server := &http.Server{
 		Addr:           ":8080",

@@ -21,9 +21,9 @@ const (
 
 type War struct {
 	Wins         map[string]int `json:"wins"`
-	Lobby        *Lobby         `json:"lobby"`
 	RoundHighest int            `json:"round_highest,omitempty"`
 
+	lobby  *Lobby
 	phase  WarPhase
 	placed map[string]int
 	hands  Hands
@@ -37,12 +37,12 @@ type WarState struct {
 	Hand           []int           `json:"hand"`
 	OtherHands     map[string]int  `json:"other_hands"`
 	GameOver       bool            `json:"game_over"`
-	Me             string          `json:"me"`
+	Lobby          *LobbyState     `json:"lobby"`
 }
 
 func NewWar(l *Lobby) FreezableGame {
-	g := &War{Lobby: l}
-	pile := CreatePile(len(g.Lobby.Clients)*10, false)
+	g := &War{lobby: l}
+	pile := CreatePile(len(g.lobby.Clients)*10, false)
 	pile.Shuffle()
 
 	g.phase = WarPhasePreparation
@@ -50,7 +50,7 @@ func NewWar(l *Lobby) FreezableGame {
 	g.placed = make(map[string]int)
 	g.Wins = make(map[string]int)
 	i := 0
-	for id := range g.Lobby.Clients {
+	for id := range g.lobby.Clients {
 		p := Pile(pile.Draw(10))
 		g.hands[id] = &p
 		g.Wins[id] = 0
@@ -60,7 +60,7 @@ func NewWar(l *Lobby) FreezableGame {
 }
 
 func (game *War) ExecuteMoves(client *Client, moves []string, data interface{}) error {
-	c := game.Lobby.Client(client)
+	c := game.lobby.Client(client)
 
 	switch moves[0] {
 	case moveWar:
@@ -93,7 +93,7 @@ func (game *War) ExecuteMoves(client *Client, moves []string, data interface{}) 
 		game.placed[c.ID] = input
 
 		allPlaced := true
-		for id := range game.Lobby.Clients {
+		for id := range game.lobby.Clients {
 			if _, ok := game.placed[id]; !ok {
 				allPlaced = false
 				break
@@ -109,7 +109,7 @@ func (game *War) ExecuteMoves(client *Client, moves []string, data interface{}) 
 }
 
 func (game *War) LegalMoves(client *Client) ([]string, map[string]interface{}) {
-	c := game.Lobby.Client(client)
+	c := game.lobby.Client(client)
 
 	if game.phase == WarPhaseReady {
 		return []string{moveWar}, nil
@@ -141,19 +141,19 @@ func (*War) Name(client *Client) string {
 }
 
 func (game *War) State(client *Client) interface{} {
-	c := game.Lobby.Client(client)
+	c := game.lobby.Client(client)
 	ws := &WarState{
 		War:        *game,
 		Placed:     game.placed[c.ID],
 		Hand:       *game.hands[c.ID],
 		OtherHands: game.hands.StateHidden(c.ID),
-		Me:         c.ID,
+		Lobby:      game.lobby.State(client),
 	}
 
 	if game.phase == WarPhasePreparation || game.phase == WarPhaseReady {
 		ws.OtherPlaced = map[string]bool{}
 
-		for id := range game.Lobby.Clients {
+		for id := range game.lobby.Clients {
 			if c.ID != id {
 				_, exists := game.placed[id]
 				ws.OtherPlaced[id] = exists
@@ -161,7 +161,7 @@ func (game *War) State(client *Client) interface{} {
 		}
 	} else if game.phase == WarPhaseReveal {
 		ws.PlacedRevealed = make(map[string]int)
-		for id := range game.Lobby.Clients {
+		for id := range game.lobby.Clients {
 			if c.ID != id {
 				ws.PlacedRevealed[id] = game.placed[id]
 			}

@@ -4,11 +4,18 @@
 		:is="statePacket.game"
 		:data="statePacket.data"
 		:moves="statePacket.moves"
-		:state="statePacket.state"></component>
+		:state="statePacket.state" />
+	<ChatBox :data="{
+		game: statePacket.game,
+		me: statePacket.state?.me || statePacket.state?.lobby?.me,
+		key: statePacket.state?.chat_key || statePacket.state?.lobby?.chat_key,
+		clients: statePacket.state?.clients || statePacket.state?.lobby?.clients,
+	}" :wsBase="wsBase" />
 </template>
 
 <script>
 import jmp from 'json-merge-patch';
+import ChatBox from './components/ChatBox.vue';
 import { useToast } from 'vue-toastification';
 const toast = useToast();
 
@@ -33,8 +40,7 @@ export default {
 			}));
 		},
 		connect() {
-			const url = `ws${this.secure ? 's' : ''}://${this.dev ? 'localhost:8080' : location.host}/ws`;
-			this.ws = new WebSocket(url);
+			this.ws = new WebSocket(`${this.wsBase}/ws`);
 			this.ws.onmessage = msg => {
 				const packet = JSON.parse(msg.data);
 
@@ -53,7 +59,7 @@ export default {
 
 				delete packet.type;
 				jmp.apply(this.statePacket, packet);
-				console.log(JSON.parse(JSON.stringify(this.statePacket.state || '{}')));
+				console.log(JSON.parse(JSON.stringify(this.statePacket.state || {})));
 
 				const { game, moves, state } = this.statePacket;
 
@@ -69,7 +75,7 @@ export default {
 					}
 				}
 			};
-			this.ws.onclose = () => this.connect();
+			this.ws.onclose = () => setTimeout(() => this.connect(), 1000);
 			this.ws.onerror = err => {
 				console.error;
 			};
@@ -82,6 +88,9 @@ export default {
 		secure() {
 			return location.protocol === 'https:';
 		},
+		wsBase() {
+			return `ws${this.secure ? 's' : ''}://${this.dev ? 'localhost:8080' : location.host}`;
+		},
 	},
 	mounted() {
 		this.connect();
@@ -89,5 +98,6 @@ export default {
 	destroy() {
 		if (this.ws) this.ws.close();
 	},
+	components: { ChatBox },
 };
 </script>

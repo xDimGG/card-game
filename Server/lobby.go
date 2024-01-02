@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -30,6 +31,7 @@ type Lobby struct {
 	Game    *string                 `json:"game"`
 	ID      string                  `json:"id"`
 	Frozen  bool                    `json:"frozen"`
+	ChatKey string                  `json:"chat_key"`
 	game    FreezableGame
 
 	mu sync.RWMutex
@@ -37,7 +39,8 @@ type Lobby struct {
 
 type LobbyState struct {
 	*Lobby
-	Me string `json:"me"`
+	Me      string `json:"me"`
+	ChatKey string `json:"chat_key"`
 }
 
 // Cleans newlines and removes extraneous spaces
@@ -68,6 +71,17 @@ func (l *Lobby) SyncAfter(t time.Duration) {
 		l.Sync()
 		l.mu.Unlock()
 	}()
+}
+
+func (l *Lobby) State(client *Client) *LobbyState {
+	c := l.Client(client)
+
+	// Maybe copy lobby
+	return &LobbyState{
+		Lobby:   l,
+		Me:      c.ID,
+		ChatKey: c.chatKey,
+	}
 }
 
 func (lm *LobbyManager) RunBotRoutine(c *Client) {
@@ -134,6 +148,7 @@ type LobbyClient struct {
 	JoinedAt     int64  `json:"joined_at"`
 	Disconnected bool   `json:"disconnected"`
 	Bot          bool   `json:"bot"`
+	chatKey      string
 }
 
 // Removes client from given lobby. Does not sync
@@ -252,7 +267,7 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 			Client:       client,
 			Name:         name,
 			Leader:       false,
-			ID:           uuid.New().String(),
+			ID:           uuid.NewString(),
 			JoinedAt:     time.Now().UnixMilli(),
 			Disconnected: false,
 		}
@@ -276,6 +291,18 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 		if lobby.game != nil {
 			return errors.New("you cannot join a game in progress")
 		}
+
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"client_id": lc.ID,
+			"lobby_id":  lobby.ID,
+		})
+
+		tokenString, err := token.SignedString(sharedKey)
+		if err != nil {
+			return err
+		}
+
+		lc.chatKey = tokenString
 
 		lobby.Clients[lc.ID] = lc
 		lm.clientToLobby.Store(client, lobbyID)
@@ -448,7 +475,7 @@ func (lm *LobbyManager) ExecuteMoves(client *Client, moves []string, data interf
 				bot:        true,
 			},
 			Name:     "Bot " + strconv.Itoa(len(lobby.Clients)),
-			ID:       uuid.New().String(),
+			ID:       uuid.NewString(),
 			JoinedAt: time.Now().UnixMilli(),
 			Bot:      true,
 		}
@@ -500,11 +527,7 @@ func (lm *LobbyManager) State(client *Client) interface{} {
 		return lobby.game.State(client)
 	}
 
-	// Maybe copy lobby
-	return LobbyState{
-		Lobby: lobby,
-		Me:    lobby.Client(client).ID,
-	}
+	return lobby.State(client)
 }
 
 func (lm *LobbyManager) Disconnect(client *Client) {

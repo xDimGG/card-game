@@ -57,8 +57,8 @@ type TheMind struct {
 	Lives     int          `json:"lives"`
 	Won       bool         `json:"won"`
 	Lost      bool         `json:"lost"`
-	Lobby     *Lobby       `json:"lobby"`
 
+	lobby    *Lobby
 	hands    Hands
 	drawPile *Pile
 }
@@ -68,11 +68,11 @@ type TheMindState struct {
 	Hand              []int          `json:"hand"`
 	OtherHands        map[string]int `json:"other_hands"`
 	OtherHandsExposed Hands          `json:"other_hands_exposed"`
-	Me                string         `json:"me"`
+	Lobby             *LobbyState    `json:"lobby"`
 }
 
 func NewTheMind(lobby *Lobby) FreezableGame {
-	game := &TheMind{Lobby: lobby}
+	game := &TheMind{lobby: lobby}
 	game.Initialize()
 	return game
 }
@@ -81,7 +81,7 @@ func (game *TheMind) Initialize() {
 	game.Round = TheMindRound{}
 	game.RoundNum = 1
 	game.Shurikens = 1
-	game.Lives = len(game.Lobby.Clients)
+	game.Lives = len(game.lobby.Clients)
 	game.Won = false
 	game.Lost = false
 	game.BeginRound()
@@ -96,7 +96,7 @@ func (game *TheMind) BeginRound() {
 	game.GeneratePile()
 	game.Round.PlayPile = []int{}
 	game.hands = Hands{}
-	for _, client := range game.Lobby.Clients {
+	for _, client := range game.lobby.Clients {
 		p := Pile(game.drawPile.Draw(game.RoundNum))
 		game.hands[client.ID] = &p
 	}
@@ -128,12 +128,12 @@ func (game *TheMind) Name(_ *Client) string {
 }
 
 func (game *TheMind) State(client *Client) interface{} {
-	lc := game.Lobby.Client(client)
+	lc := game.lobby.Client(client)
 
 	s := &TheMindState{
 		TheMind: *game,
 		Hand:    *game.hands[lc.ID],
-		Me:      lc.ID,
+		Lobby:   game.lobby.State(client),
 	}
 
 	if game.Round.Lost || game.Round.Won {
@@ -160,7 +160,7 @@ func (game *TheMind) LegalMoves(client *Client) ([]string, map[string]interface{
 		return []string{moveRetryRound}, nil
 	}
 
-	lc := game.Lobby.Client(client)
+	lc := game.lobby.Client(client)
 	cards := game.hands[lc.ID]
 	moves := make([]string, len(*cards))
 	for i, card := range *cards {
@@ -208,13 +208,13 @@ func (game *TheMind) ExecuteMoves(client *Client, moves []string, data interface
 			return err
 		}
 
-		lc := game.Lobby.Client(client)
+		lc := game.lobby.Client(client)
 		hand := game.hands[lc.ID]
 		i := slices.Index(*hand, input)
 		*game.hands[lc.ID] = slices.Delete(*game.hands[lc.ID], i, i+1)
 
 		if game.Round.LowestCards != nil {
-			c := game.Lobby.Client(client)
+			c := game.lobby.Client(client)
 			if c != nil {
 				// Checking if for some reason this player doesn't play their lowest card
 				if game.Round.LowestCards[c.ID] == input {
@@ -240,12 +240,12 @@ func (game *TheMind) ExecuteMoves(client *Client, moves []string, data interface
 			}
 		}
 
-		if len(game.Round.PlayPile) == game.RoundNum*len(game.Lobby.Clients) {
+		if len(game.Round.PlayPile) == game.RoundNum*len(game.lobby.Clients) {
 			game.Round.Won = true
 			// 2 players: 12 rounds to win
 			// 3 players: 10 rounds to win
 			// 4 players: 8 rounds to win
-			if game.RoundNum >= 14-(len(game.Lobby.Clients)*2) {
+			if game.RoundNum >= 14-(len(game.lobby.Clients)*2) {
 				game.Won = true
 			}
 		}

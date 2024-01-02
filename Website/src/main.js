@@ -15,6 +15,10 @@ import './assets/style.css';
 
 const app = createApp(App);
 
+app.use(Toast);
+VueClipboard.config.autoSetContainer = true
+app.use(VueClipboard);
+
 /* eslint-disable vue/multi-word-component-names */
 app.component('lobby', Lobby);
 app.component('the_mind', GameTheMind);
@@ -22,8 +26,5 @@ app.component('war', GameWar);
 app.component('uno', GameUno);
 app.component('halli_galli', GameHalliGalli);
 
-app.use(Toast);
-VueClipboard.config.autoSetContainer = true
-app.use(VueClipboard);
 
 app.mount('#app');

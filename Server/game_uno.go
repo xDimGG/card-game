@@ -73,7 +73,6 @@ func parseCard(raw int) (t cardType, col cardColor, num int) {
 }
 
 type Uno struct {
-	Lobby         *Lobby    `json:"lobby"`
 	CurrentPlayer int       `json:"current_player"` // Whose turn is it
 	PlayPile      *Pile     `json:"play_pile"`      // What cards have been played so far
 	PlayerOrder   []string  `json:"player_order"`   // What order do players play in
@@ -82,6 +81,7 @@ type Uno struct {
 	ChosenColor   cardColor `json:"chosen_color"`
 	Winners       []string  `json:"winners"` // Who won and in what order
 
+	lobby    *Lobby
 	unoAt    map[string]int64 // Whenever each player last reached one card
 	drawPile *Pile
 	hands    Hands
@@ -103,7 +103,7 @@ type UnoState struct {
 	Uno
 	Hand       []int          `json:"hand"`
 	OtherHands map[string]int `json:"other_hands"`
-	Me         string         `json:"me"`
+	Lobby      *LobbyState    `json:"lobby"`
 }
 
 func NewUno(l *Lobby) FreezableGame {
@@ -113,7 +113,7 @@ func NewUno(l *Lobby) FreezableGame {
 	p.Shuffle()
 
 	g := &Uno{
-		Lobby:       l,
+		lobby:       l,
 		Clockwise:   true,
 		ChosenColor: -1,
 		Winners:     []string{},
@@ -197,7 +197,7 @@ func (g *Uno) nextPlayer() {
 }
 
 func (g *Uno) ExecuteMoves(client *Client, moves []string, data interface{}) (err error) {
-	lc := g.Lobby.Client(client)
+	lc := g.lobby.Client(client)
 	hand := g.hands[lc.ID]
 
 	switch moves[0] {
@@ -270,7 +270,7 @@ func (g *Uno) ExecuteMoves(client *Client, moves []string, data interface{}) (er
 		// Check if player has one card remaining
 		if len(*hand) == 1 {
 			g.unoAt[lc.ID] = time.Now().UnixMilli()
-			g.Lobby.SyncAfter(unoGracePeriod * time.Millisecond)
+			g.lobby.SyncAfter(unoGracePeriod * time.Millisecond)
 		}
 		// Check if player has won
 		if len(*hand) == 0 {
@@ -289,7 +289,7 @@ func (g *Uno) LegalMoves(client *Client) (moves []string, extra map[string]inter
 		moves = append(moves, MoveReturn)
 	}
 
-	c := g.Lobby.Client(client)
+	c := g.lobby.Client(client)
 	for id, at := range g.unoAt {
 		if at == 0 {
 			continue
@@ -333,12 +333,12 @@ func (*Uno) Name(client *Client) string {
 
 // State implements FreezableGame
 func (g *Uno) State(client *Client) interface{} {
-	c := g.Lobby.Client(client)
+	c := g.lobby.Client(client)
 	return &UnoState{
 		Uno:        *g,
 		Hand:       *g.hands[c.ID],
 		OtherHands: g.hands.StateHidden(c.ID),
-		Me:         c.ID,
+		Lobby:      g.lobby.State(client),
 	}
 }
 

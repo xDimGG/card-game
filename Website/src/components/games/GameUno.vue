@@ -121,7 +121,7 @@ export default {
 	computed: {
 		players() {
 			let order = this.state.player_order;
-			const me = order.indexOf(this.state.me);
+			const me = order.indexOf(this.state.lobby.me);
 			order = order.slice(me).concat(order.slice(0, me));
 			return reorder(order);
 		},
@@ -130,7 +130,7 @@ export default {
 		},
 		hands() {
 			return this.players.map(id => {
-				if (this.state.me === id)
+				if (this.state.lobby.me === id)
 					return this.state.hand.map((raw, i) => {
 						const card = this.convertCard(raw);
 
