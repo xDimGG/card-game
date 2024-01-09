@@ -1,3 +1,7 @@
+<script setup>
+import ChatVoice from './components/ChatVoice.vue';
+</script>
+
 <template>
 	<component
 		@send="send"
@@ -5,7 +9,7 @@
 		:data="statePacket.data"
 		:moves="statePacket.moves"
 		:state="statePacket.state" />
-	<ChatBox :data="{
+	<ChatVoice :data="{
 		game: statePacket.game,
 		me: statePacket.state?.me || statePacket.state?.lobby?.me,
 		key: statePacket.state?.chat_key || statePacket.state?.lobby?.chat_key,
@@ -15,7 +19,6 @@
 
 <script>
 import jmp from 'json-merge-patch';
-import ChatBox from './components/ChatBox.vue';
 import { useToast } from 'vue-toastification';
 const toast = useToast();
 
@@ -98,6 +101,5 @@ export default {
 	destroy() {
 		if (this.ws) this.ws.close();
 	},
-	components: { ChatBox },
 };
 </script>

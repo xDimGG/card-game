@@ -10,18 +10,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var chatUpgrader = websocket.Upgrader{
+var voiceUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
-// map of chatLobbies to clients to connections
-// var chatLobbies = map[string]map[string]*websocket.Conn{}
-var chatLobbies sync.Map
+// map of voiceLobbies to clients to connections
+// var voiceLobbies = map[string]map[string]*websocket.Conn{}
+var voiceLobbies sync.Map
 
-func handleChatClose(lobbyID string, clientID string) {
-	if lobbyAny, ok := chatLobbies.Load(lobbyID); ok {
+func handlevoiceClose(lobbyID string, clientID string) {
+	if lobbyAny, ok := voiceLobbies.Load(lobbyID); ok {
 		lobby := lobbyAny.(*sync.Map)
 		if clientAny, ok := lobby.Load(clientID); ok {
 			client := clientAny.(*websocket.Conn)
@@ -37,12 +37,12 @@ func handleChatClose(lobbyID string, clientID string) {
 		})
 
 		if empty {
-			chatLobbies.Delete(lobbyID)
+			voiceLobbies.Delete(lobbyID)
 		}
 	}
 }
 
-func handleChatWs(w http.ResponseWriter, r *http.Request) {
+func handleVoiceWs(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		// Just to make sure the server won't crash
 		if r := recover(); r != nil {
@@ -57,14 +57,14 @@ func handleChatWs(w http.ResponseWriter, r *http.Request) {
 
 	var lobbyID, clientID string
 
-	conn, err := chatUpgrader.Upgrade(w, r, nil)
+	conn, err := voiceUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade:", err)
 		return
 	}
 
 	conn.SetCloseHandler(func(code int, text string) error {
-		handleChatClose(lobbyID, clientID)
+		handlevoiceClose(lobbyID, clientID)
 		return nil
 	})
 
@@ -95,34 +95,48 @@ func handleChatWs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	conn.WriteMessage(websocket.TextMessage, []byte("OK"))
-
-	lobbyAny, _ := chatLobbies.LoadOrStore(lobbyID, &sync.Map{})
+	lobbyAny, _ := voiceLobbies.LoadOrStore(lobbyID, &sync.Map{})
 	lobby := lobbyAny.(*sync.Map)
 
 	// If a user joins more than once, remove the previous instance
 	if _, ok := lobby.Load(clientID); ok {
-		handleChatClose(lobbyID, clientID)
+		handlevoiceClose(lobbyID, clientID)
 	}
+
+	lobby.Range(func(_, clientAny interface{}) bool {
+		client := clientAny.(*websocket.Conn)
+		client.WriteMessage(websocket.TextMessage, []byte(clientID))
+
+		return true
+	})
 
 	lobby.Store(clientID, conn)
 
 	for {
 		messageType, msg, err := conn.ReadMessage()
 		if err != nil {
-			handleChatClose(lobbyID, clientID)
+			handlevoiceClose(lobbyID, clientID)
 			return
 		}
 
 		if messageType == websocket.TextMessage {
-			lobby.Range(func(_, clientAny interface{}) bool {
-				client := clientAny.(*websocket.Conn)
-				client.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s:%s", clientID, msg)))
+			log.Printf("[voice] %s->%s: %s\n", clientID, lobbyID, msg)
 
-				return true
-			})
+			if len(msg) < 40 {
+				continue
+			}
+			recipient := string(msg[:len(clientID)])
+			if recipient == clientID {
+				continue
+			}
 
-			log.Printf("[chat] %s->%s: %s\n", clientID, lobbyID, msg)
+			// Replace recipient ID with sender ID
+			copy(msg, clientID)
+
+			if clientAny, ok := lobby.Load(recipient); ok {
+				receiver := clientAny.(*websocket.Conn)
+				receiver.WriteMessage(websocket.TextMessage, msg)
+			}
 		}
 	}
 }
